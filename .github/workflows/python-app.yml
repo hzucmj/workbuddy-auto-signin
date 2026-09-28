@@ -18,13 +18,59 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: "3.10"
-        cache: 'pip'
 
-    - name: Install Python dependencies
+    - name: Install pip
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Run task
+      id: run_task
       run: |
         python signin.py auto
+
+    # Lark飞书推送，always()：成功失败都执行
+    - name: Lark Notify
+      if: always()
+      env:
+        LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+      run: |
+        if [ -z "$LARK_WEBHOOK" ]; then
+          echo "⚠️ Lark webhook secret未配置，跳过通知"
+          exit 0
+        fi
+
+        # 判断任务结果
+        if [[ "${{ steps.run_task.conclusion }}" == "success" ]]; then
+          STATUS="✅ 签到任务成功"
+          COLOR="green"
+        else
+          STATUS="❌ 签到任务失败"
+          COLOR="red"
+        fi
+
+        # 北京时间
+        TZ='Asia/Shanghai'
+        NOW=$(date '+%Y-%m-%d %H:%M:%S')
+        JOB_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        curl -X POST "$LARK_WEBHOOK" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"msg_type\": \"interactive\",
+          \"card\": {
+            \"header\": {
+              \"title\": {\"tag\":\"plain_text\",\"content\":\"${STATUS}\"},
+              \"template\":\"${COLOR}\"
+            },
+            \"elements\": [
+              {
+                \"tag\": \"div\",
+                \"text\": {
+                  \"tag\": \"lark_md\",
+                  \"content\": \"⏰执行时间：${NOW}\\n📦仓库：${{ github.repository }}\\n🔗任务日志：[点击查看](${JOB_URL})\"
+                }
+              }
+            ]
+          }
+        }"
+
