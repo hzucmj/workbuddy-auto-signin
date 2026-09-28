@@ -1643,38 +1643,42 @@ def _run(action):
              action)
         return 2
 
-    auth_file, looked_in = find_auth_file()
-    env_override = os.environ.get("WORKBUDDY_AUTH_FILE")
-    if not auth_file or not os.path.exists(auth_file):
-        if env_override:
-            report = ("WORKBUDDY_AUTH_FILE 指向的文件不存在：%s" % env_override)
-        else:
-            report = ("未找到 WorkBuddy 登录凭据。请先在本机登录 WorkBuddy 桌面端；"
-                      "或设置环境变量 WORKBUDDY_AUTH_FILE 指向 workbuddy-desktop.info。")
-        emit({"result": "NO_AUTH", "report": report, "looked_in": looked_in,
-              "needs_attention": True}, action)
-        return 2
-
-    try:
-        session = load_session_retry(auth_file)
-    except json.JSONDecodeError as e:
-        # JSONDecodeError 是 ValueError 的子类，必须先于下面的分支捕获，否则会被误归类
-        emit({"result": "ERROR",
-              "report": "登录凭据文件不是合法 JSON（%s），请重新登录 WorkBuddy 桌面端" % e},
-             action)
-        return 2
-    except ValueError as e:
-        # 文件编码损坏（UnicodeDecodeError 也是 ValueError 子类）等情形
-        emit({"result": "ERROR",
-              "report": "登录凭据文件内容损坏（%s: %s），请重新登录 WorkBuddy 桌面端" % (type(e).__name__, e)},
-             action)
-        return 2
-    except Exception as e:
-        # 无读取权限等其它 IO 问题
-        emit({"result": "ERROR",
-              "report": "读取登录凭据失败（%s: %s），请重新登录 WorkBuddy 桌面端" % (type(e).__name__, e)},
-             action)
-        return 2
+    workbuddy_auth_content = os.environ.get("WORKBUDDY_AUTH_CONTENT")
+    if workbuddy_auth_content and len(workbuddy_auth_content) > 0:
+        session = json.loads(workbuddy_auth_content)
+    else:
+        auth_file, looked_in = find_auth_file()
+        env_override = os.environ.get("WORKBUDDY_AUTH_FILE")
+        if not auth_file or not os.path.exists(auth_file):
+            if env_override:
+                report = ("WORKBUDDY_AUTH_FILE 指向的文件不存在：%s" % env_override)
+            else:
+                report = ("未找到 WorkBuddy 登录凭据。请先在本机登录 WorkBuddy 桌面端；"
+                          "或设置环境变量 WORKBUDDY_AUTH_FILE 指向 workbuddy-desktop.info。")
+            emit({"result": "NO_AUTH", "report": report, "looked_in": looked_in,
+                  "needs_attention": True}, action)
+            return 2
+    
+        try:
+            session = load_session_retry(auth_file)
+        except json.JSONDecodeError as e:
+            # JSONDecodeError 是 ValueError 的子类，必须先于下面的分支捕获，否则会被误归类
+            emit({"result": "ERROR",
+                  "report": "登录凭据文件不是合法 JSON（%s），请重新登录 WorkBuddy 桌面端" % e},
+                 action)
+            return 2
+        except ValueError as e:
+            # 文件编码损坏（UnicodeDecodeError 也是 ValueError 子类）等情形
+            emit({"result": "ERROR",
+                  "report": "登录凭据文件内容损坏（%s: %s），请重新登录 WorkBuddy 桌面端" % (type(e).__name__, e)},
+                 action)
+            return 2
+        except Exception as e:
+            # 无读取权限等其它 IO 问题
+            emit({"result": "ERROR",
+                  "report": "读取登录凭据失败（%s: %s），请重新登录 WorkBuddy 桌面端" % (type(e).__name__, e)},
+                 action)
+            return 2
 
     try:
         if action == "doctor":
