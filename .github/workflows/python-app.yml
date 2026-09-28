@@ -33,6 +33,7 @@ jobs:
       if: always()
       env:
         LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+        WORKBUDDY_AUTH_CONTENT: ${{ secrets.WORKBUDDY_AUTH_CONTENT }}
       run: |
         if [ -z "$LARK_WEBHOOK" ]; then
           echo "⚠️ Lark webhook secret未配置，跳过通知"
